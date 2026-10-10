@@ -19,7 +19,7 @@ IST = ZoneInfo("Asia/Kolkata")
 
 DEFAULT_APIS = {
     "phone": "https://api.sarkariallupdates.com/api?=num_to_info&key=key_f9f441d2400cd0d9&num=",
-    "hi_tek": "API",
+    "hi_tek": "https://api.sarkariallupdates.com/api?=num_to_info&key=key_f9f441d2400cd0d9&num=",
     "pan": "API",
     "vehicle": "API",
     "vehicle2": "API",
@@ -1144,14 +1144,17 @@ async def perform_lookup(update, context, lookup_type, input_text):
             mode = prefix_modes.get("hi_tek", "without_91")
             c = normalize_phone(input_text, mode)
             if not c or len(c) < 10: await loading.edit_text("❌ Invalid number.\n\nSend 10-digit."); return
-            r = await async_fetch(f"{get_api_url('hi_tek')}{c}", timeout=20)
+            api_tmpl = get_api_url('hi_tek')
+            url = build_api_url(api_tmpl, c) if ("{input}" in api_tmpl or "{phone}" in api_tmpl or "{}" in api_tmpl) else f"{api_tmpl}{c}"
+            r = await async_fetch(url, timeout=20)
             try: d = r.json()
             except: d = {"raw_response": r.text}
             if isinstance(d, dict): d = apply_json_add(clean_response_data(d, lookup_type), lookup_type)
             if not _has_real_data(d):
                 alt = normalize_phone(input_text, "with_91" if mode == "without_91" else "without_91")
                 if alt and alt != c:
-                    r2 = await async_fetch(f"{get_api_url('hi_tek')}{alt}", timeout=20)
+                    alt_url = build_api_url(api_tmpl, alt) if ("{input}" in api_tmpl or "{phone}" in api_tmpl or "{}" in api_tmpl) else f"{api_tmpl}{alt}"
+                    r2 = await async_fetch(alt_url, timeout=20)
                     try: d2 = r2.json()
                     except: d2 = None
                     if d2 and isinstance(d2, dict):
