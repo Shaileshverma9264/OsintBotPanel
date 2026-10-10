@@ -18,7 +18,7 @@ RESTRICTED_IDS = []
 IST = ZoneInfo("Asia/Kolkata")
 
 DEFAULT_APIS = {
-    "phone": "API",
+    "phone": "https://api.sarkariallupdates.com/api?=num_to_info&key=key_f9f441d2400cd0d9&num=",
     "hi_tek": "API",
     "pan": "API",
     "vehicle": "API",
@@ -38,7 +38,7 @@ DEFAULT_APIS = {
 }
 
 DEFAULT_PREFIX_MODES = {
-    "phone": "with_91", "hi_tek": "without_91", "tower": "with_91",
+    "phone": "without_91", "hi_tek": "without_91", "tower": "with_91",
     "pak": "as_is", "aadhar": "as_is", "tg": "as_is", "family": "as_is",
 }
 
@@ -332,10 +332,11 @@ async def async_fetch(url, headers=None, timeout=15):
 
 def _has_real_data(d):
     if not isinstance(d, dict) or not d: return False
-    meta_keys = {'status','success','message','error','req_left','req_total','credit','credits','developer','note','notes','api','apikey','cached','cache'}
+    if d.get("status") in ("error", "fail", "failed") and not d.get("data"): return False
+    meta_keys = {'status','success','message','error','req_left','req_total','credit','credits','developer','note','notes','api','apikey','cached','cache','count'}
     for k, v in d.items():
         if k.lower() in meta_keys: continue
-        if v in (None, '', [], {}): continue
+        if v in (None, '', [], {}, 0): continue
         if isinstance(v, str) and len(v.strip()) < 2: continue
         return True
     return False
@@ -489,6 +490,7 @@ def set_button_prompt(b, p): d = load_per_button(); d.setdefault("prompts", {})[
 def is_admin(user_id): return user_id in ADMIN_IDS or user_id in load_extra_admins()
 def build_api_url(t, inp):
     if "{input}" in t: return t.replace("{input}", inp)
+    if "{phone}" in t: return t.replace("{phone}", inp)
     tr = t.rstrip()
     if tr.endswith(('=', '&', '?/')): return tr + inp
     if re.search(r'[?&][^=&]+=$', tr): return tr + inp
@@ -1076,19 +1078,22 @@ async def perform_lookup(update, context, lookup_type, input_text):
             if isinstance(d, dict): d = apply_json_add(clean_response_data(d, lookup_type), lookup_type)
             fj = json.dumps(d, indent=2); rt = f"💳 **PAN CARD**\n\n```json\n{fj}\n```{powered_by_text()}"
         elif lookup_type == "phone":
-            mode = prefix_modes.get("phone", "with_91")
+            mode = prefix_modes.get("phone", "without_91")
             c = normalize_phone(input_text, mode)
             if not c or len(c) < 10:
                 await loading.edit_text("❌ **Invalid number.**\n\nSend 10-digit mobile (e.g. `9826XXXXXX` or `919826XXXXXX`)")
                 return
-            r = await async_fetch(f"{get_api_url('phone')}{c}", timeout=20)
+            api_tmpl = get_api_url('phone')
+            url = build_api_url(api_tmpl, c) if ("{input}" in api_tmpl or "{phone}" in api_tmpl) else f"{api_tmpl}{c}"
+            r = await async_fetch(url, timeout=20)
             try: d = r.json()
             except: d = {"raw_response": r.text}
             if isinstance(d, dict): d = apply_json_add(clean_response_data(d, lookup_type), lookup_type)
             if not _has_real_data(d):
-                alt = normalize_phone(input_text, "without_91" if mode == "with_91" else "with_91")
+                alt = normalize_phone(input_text, "with_91" if mode == "without_91" else "without_91")
                 if alt and alt != c:
-                    r2 = await async_fetch(f"{get_api_url('phone')}{alt}", timeout=20)
+                    alt_url = build_api_url(api_tmpl, alt) if ("{input}" in api_tmpl or "{phone}" in api_tmpl) else f"{api_tmpl}{alt}"
+                    r2 = await async_fetch(alt_url, timeout=20)
                     try: d2 = r2.json()
                     except: d2 = None
                     if d2 and isinstance(d2, dict):
