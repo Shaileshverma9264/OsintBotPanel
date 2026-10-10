@@ -735,6 +735,41 @@ BUTTON_LOOKUP_MAP = {
 }
 LOOKUP_TO_DISPLAY = {v: k for k, v in BUTTON_LOOKUP_MAP.items()}
 
+ALL_MAIN_BUTTON_TEXTS = {
+    "📱 Phone Lookup", "📱 Hi Tek", "🆔 Aadhar", "💳 PAN Lookup",
+    "🚗 Vehicle Lookup", "🚗 Vehicle2 Lookup", "💳 UPI Lookup",
+    "🕵️ Telegram ID Lookup", "🌍 IP Lookup", "🇵🇰 Pak Lookup",
+    "👨‍👩‍👧 Family Lookup", "📸 Instagram Lookup", "🏢 GST Lookup",
+    "📄 PAN to GST", "🏦 IFSC Lookup", "📡 Call Tower Lookup",
+    "📄 RC to PDF", "💣 Call/SMS Bomb", "🛑 Stop Bomb",
+    "🔗 Refer & Earn", "🎟️ Redeem Code", "👤 Owner",
+    "ℹ️ Bot Help", "👤 My Account", "🛠️ Bot Management"
+}
+
+def is_menu_button(text):
+    if not text: return False
+    t = text.strip()
+    if t.startswith("/"): return True
+    if t.lower() in ("cancel", "/cancel"): return True
+    if t in BUTTON_LOOKUP_MAP or t in ALL_MAIN_BUTTON_TEXTS: return True
+    if t in load_custom_buttons() or t in load_link_buttons(): return True
+    return False
+
+def clear_user_pending_actions(context):
+    keys = [
+        "admin_action", "credit_targets", "approve_duration", "block_targets",
+        "notes_target", "lookup_type", "bomb_mode", "awaiting_redeem",
+        "pay_new_name", "pay_new_value", "pay_new_emoji", "pay_new_note",
+        "plan_label", "plan_price", "redeem_credits", "replace_api_target",
+        "set_prompt_target", "hide_field_target", "addword_target",
+        "setword_target", "setword_spec_target", "setword_spec_value_input",
+        "json_add_target", "json_add_key_input", "protect_target",
+        "promote_perm", "new_link_name", "new_link_url", "new_link_btn_text",
+        "new_button_name", "new_button_api"
+    ]
+    for k in keys:
+        context.user_data.pop(k, None)
+
 def get_bot_management_menu():
     dm_s = "✅ ON" if load_dm_mode().get("enabled", True) else "🚫 OFF"
     mt_s = "🛠️ ON" if load_maintenance().get("enabled") else "✅ OFF"
@@ -1474,7 +1509,9 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data not in ("admin_back", "admin_noop"): invalidate_menu_cache()
 
     if data == "admin_noop": await q.answer("ℹ️", show_alert=False); return
-    if data == "admin_close": await q.edit_message_text("🔒 Closed.")
+    if data == "admin_close":
+        clear_user_pending_actions(context)
+        await q.edit_message_text("🔒 Closed.")
 
     # Credit settings
     elif data == "admin_set_default_credits":
@@ -2298,6 +2335,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if "|" in p: btn, k = p.split("|",1); remove_json_add(btn, k)
         await q.edit_message_text("🗑️ Removed.", reply_markup=get_back_keyboard())
     elif data == "admin_back":
+        clear_user_pending_actions(context)
         await q.edit_message_text("🛠️ **Admin Panel:**", reply_markup=get_cached_menu())
 
 # ==================== VERIFY ====================
@@ -2312,6 +2350,7 @@ async def verify_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==================== START ====================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user; uid = user.id
+    clear_user_pending_actions(context)
 
     users_before = load_all_users()
     is_new_user = str(uid) not in users_before
@@ -2475,6 +2514,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not dm and uid not in dmp: await reply_message(update, context, "🚫 **DM disabled.**", include_user_tag=False); return
     if not is_admin(uid) and not await check_force_join(uid, context):
         await reply_message(update, context, "⚠️ **Join Required:**", reply_markup=force_join_keyboard(), include_user_tag=False); return
+
+    if text.lower() in ("/cancel", "cancel"):
+        clear_user_pending_actions(context)
+        await reply_message(update, context, "🚫 **Action cancelled.**", reply_markup=get_keyboard(uid), include_user_tag=False)
+        return
+
+    if is_menu_button(text):
+        clear_user_pending_actions(context)
 
     # Referral accessible without approval
     if text == "🔗 Refer & Earn":
@@ -2680,7 +2727,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif a == "approve_with_duration":
             context.user_data.pop("admin_action", None)
             days = context.user_data.pop("approve_duration", 30); ids = re.findall(r'\d+', text)
-            if not ids: await reply_message(update, context, "❌ No IDs."); return
+            if not ids: await reply_message(update, context, "❌ No IDs found. Action cancelled."); return
             label = "♾️ Permanent" if days == 0 else f"{days} days"
             for tid in ids:
                 t = int(tid); set_approval(t, days)
@@ -2705,8 +2752,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for us, info in found: txt += f"• `{us}` – {info.get('full_name','?')}\n  @{info.get('username')}\n  Credits: `{get_credits(int(us))}`\n\n"
             await reply_message(update, context, txt); return
         elif a == "approve_user":
-            context.user_data.pop("admin_action"); ids = re.findall(r'\d+', text)
-            if not ids: await reply_message(update, context, "❌ No IDs."); return
+            context.user_data.pop("admin_action", None); ids = re.findall(r'\d+', text)
+            if not ids: await reply_message(update, context, "❌ No IDs found. Action cancelled."); return
             lst = []
             for tid in ids:
                 t = int(tid); set_approval(t, 0); lst.append(str(t))
@@ -2756,18 +2803,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif a == "addcredits":
             if not context.user_data.get("credit_targets"):
                 ids = re.findall(r'\d+', text)
-                if not ids: await reply_message(update, context, "❌ No IDs."); return
+                if not ids:
+                    context.user_data.pop("admin_action", None)
+                    await reply_message(update, context, "❌ No IDs found. Action cancelled.")
+                    return
                 context.user_data["credit_targets"] = ids
                 await reply_message(update, context, f"🎫 Send amount:")
             else:
+                context.user_data.pop("admin_action", None)
+                ids = context.user_data.pop("credit_targets", [])
                 if text.isdigit():
-                    context.user_data.pop("admin_action"); ids = context.user_data.pop("credit_targets"); amt = int(text)
+                    amt = int(text)
                     for tid in ids:
                         t = int(tid); add_credits(t, amt)
                         try: await context.bot.send_message(chat_id=t, text=f"🎉 +{amt} credits! Balance: `{get_credits(t)}`")
                         except: pass
                     await reply_message(update, context, f"✅ Added `{amt}` to `{len(ids)}` user(s).")
-                else: await reply_message(update, context, "❌ Invalid.")
+                else:
+                    await reply_message(update, context, "❌ Invalid amount. Action cancelled.")
             return
         elif a == "removecredits_id":
             context.user_data.pop("admin_action"); ids = re.findall(r'\d+', text)
