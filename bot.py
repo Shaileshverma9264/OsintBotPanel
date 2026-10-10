@@ -32,7 +32,7 @@ DEFAULT_APIS = {
     "instagram": "API",
     "gst": "API",
     "pan_to_gst": "API",
-    "ifsc": "API",
+    "ifsc": "https://api.sarkariallupdates.com/api?=ifse&key=30day&ifse=",
     "tower": "API",
     "rc_pdf": "API",
 }
@@ -332,8 +332,8 @@ async def async_fetch(url, headers=None, timeout=15):
 
 def _has_real_data(d):
     if not isinstance(d, dict) or not d: return False
-    if d.get("status") in ("error", "fail", "failed") and not d.get("data"): return False
-    meta_keys = {'status','success','message','error','req_left','req_total','credit','credits','developer','note','notes','api','apikey','cached','cache','count'}
+    if d.get("status") in ("error", "fail", "failed", False) and not d.get("data"): return False
+    meta_keys = {'status','success','message','error','req_left','req_total','credit','credits','developer','note','notes','api','apikey','cached','cache','count','status_code'}
     for k, v in d.items():
         if k.lower() in meta_keys: continue
         if v in (None, '', [], {}, 0): continue
@@ -489,8 +489,10 @@ def set_button_prompt(b, p): d = load_per_button(); d.setdefault("prompts", {})[
 
 def is_admin(user_id): return user_id in ADMIN_IDS or user_id in load_extra_admins()
 def build_api_url(t, inp):
+    if "{}" in t: return t.replace("{}", inp)
     if "{input}" in t: return t.replace("{input}", inp)
     if "{phone}" in t: return t.replace("{phone}", inp)
+    if "{ifsc}" in t: return t.replace("{ifsc}", inp)
     tr = t.rstrip()
     if tr.endswith(('=', '&', '?/')): return tr + inp
     if re.search(r'[?&][^=&]+=$', tr): return tr + inp
@@ -1235,10 +1237,16 @@ async def perform_lookup(update, context, lookup_type, input_text):
         elif lookup_type == "ifsc":
             c = input_text.strip().upper()
             if len(c)!=11: await loading.edit_text("❌ 11-char IFSC."); return
-            r = await async_fetch(get_api_url('ifsc').format(c))
+            api_tmpl = get_api_url('ifsc')
+            url = build_api_url(api_tmpl, c) if ("{input}" in api_tmpl or "{ifsc}" in api_tmpl or "{}" in api_tmpl) else f"{api_tmpl}{c}"
+            r = await async_fetch(url, timeout=20)
             try: d = r.json()
             except: d = {"raw_response": r.text}
             if isinstance(d, dict):
+                if d.get("status") in (False, "error", "fail", "failed") and not d.get("data"):
+                    msg = d.get("message", "No bank branch found.")
+                    await loading.edit_text(f"⚠️ **IFSC Not Found** for `{c}`\n\n_{msg}_")
+                    return
                 if "data" in d and isinstance(d["data"], dict): d["data"] = apply_json_add(clean_response_data(d["data"], lookup_type), lookup_type)
                 d = clean_response_data(d, lookup_type)
             fj = json.dumps(d, indent=2); rt = f"🏦 **IFSC**\n🔢 `{c}`\n\n```json\n{fj}\n```{powered_by_text()}"
