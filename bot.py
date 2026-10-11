@@ -23,7 +23,7 @@ DEFAULT_APIS = {
     "pan": "https://api.sarkariallupdates.com/api?=pan2dob_name&key=30day&pan2dob_name=",
     "vehicle": "API",
     "vehicle2": "API",
-    "upi": "API",
+    "upi": "https://shuruuuuu-upi-basic-api-shuru-33.vercel.app/search?q=",
     "pak": "API",
     "ip": "API",
     "family": "API",
@@ -494,6 +494,7 @@ def build_api_url(t, inp):
     if "{phone}" in t: return t.replace("{phone}", inp)
     if "{ifsc}" in t: return t.replace("{ifsc}", inp)
     if "{pan}" in t: return t.replace("{pan}", inp)
+    if "{upi}" in t: return t.replace("{upi}", inp)
     tr = t.rstrip()
     if tr.endswith(('=', '&', '?/')): return tr + inp
     if re.search(r'[?&][^=&]+=$', tr): return tr + inp
@@ -1209,12 +1210,29 @@ async def perform_lookup(update, context, lookup_type, input_text):
             if isinstance(d, dict): d = apply_json_add(clean_response_data(d, lookup_type), lookup_type)
             fj = json.dumps(d, indent=2); rt = f"👥 **FAMILY INFO**\n🔢 `{c}`\n\n```json\n{fj}\n```{powered_by_text()}"
         elif lookup_type == "upi":
-            if "@" not in input_text: await loading.edit_text("❌ Invalid UPI."); return
-            r = await async_fetch(f"{get_api_url('upi')}{input_text}")
+            c = input_text.strip()
+            if "@" not in c:
+                await loading.edit_text("❌ **Invalid UPI ID.**\n\nExample: `user@upi`")
+                return
+            api_tmpl = get_api_url('upi')
+            url = build_api_url(api_tmpl, c) if ("{input}" in api_tmpl or "{upi}" in api_tmpl or "{}" in api_tmpl) else f"{api_tmpl}{c}"
+            r = await async_fetch(url, timeout=20)
             try: d = r.json()
             except: d = {"raw_response": r.text}
-            if isinstance(d, dict): d = apply_json_add(clean_response_data(d, lookup_type), lookup_type)
-            fj = json.dumps(d, indent=2); rt = f"⚡ **UPI INFO**\n🆔 `{input_text}`\n\n```json\n{fj}\n```{powered_by_text()}"
+            if isinstance(d, dict):
+                verif = d.get("verification", {})
+                if isinstance(verif, dict) and verif.get("validVpa") is False:
+                    await loading.edit_text(f"⚠️ **UPI Not Found / Invalid** for `{c}`")
+                    return
+                if (d.get("error") or d.get("status") in (False, "error", "fail", "failed")) and not d.get("verification"):
+                    err_msg = d.get("error") or d.get("message") or "UPI lookup failed."
+                    await loading.edit_text(f"⚠️ **UPI Not Found** for `{c}`\n\n_{err_msg}_")
+                    return
+                d = apply_json_add(clean_response_data(d, lookup_type), lookup_type)
+            if not _has_real_data(d):
+                await loading.edit_text(f"⚠️ **No data found** for `{c}`")
+                return
+            fj = json.dumps(d, indent=2); rt = f"⚡ **UPI INFO**\n🆔 `{c}`\n\n```json\n{fj}\n```{powered_by_text()}"
         elif lookup_type == "tg":
             c = input_text.strip().lstrip("@")
             if not c: await loading.edit_text("❌ Send ID/username."); return
