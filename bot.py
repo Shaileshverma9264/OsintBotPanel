@@ -20,7 +20,7 @@ IST = ZoneInfo("Asia/Kolkata")
 DEFAULT_APIS = {
     "phone": "https://api.sarkariallupdates.com/api?=num_to_info&key=key_f9f441d2400cd0d9&num=",
     "hi_tek": "https://api.sarkariallupdates.com/api?=num_to_info&key=key_f9f441d2400cd0d9&num=",
-    "pan": "API",
+    "pan": "https://api.sarkariallupdates.com/api?=pan2dob_name&key=30day&pan2dob_name=",
     "vehicle": "API",
     "vehicle2": "API",
     "upi": "API",
@@ -493,6 +493,7 @@ def build_api_url(t, inp):
     if "{input}" in t: return t.replace("{input}", inp)
     if "{phone}" in t: return t.replace("{phone}", inp)
     if "{ifsc}" in t: return t.replace("{ifsc}", inp)
+    if "{pan}" in t: return t.replace("{pan}", inp)
     tr = t.rstrip()
     if tr.endswith(('=', '&', '?/')): return tr + inp
     if re.search(r'[?&][^=&]+=$', tr): return tr + inp
@@ -1109,11 +1110,32 @@ async def perform_lookup(update, context, lookup_type, input_text):
                 fj = json.dumps(ex or {"rc":rc}, indent=2); rt = f"🚗 **VEHICLE2**\n{card}{powered_by_text()}"
             else: raise Exception("VAHANX failed")
         elif lookup_type == "pan":
-            r = await async_fetch(f"{get_api_url('pan')}{input_text.upper()}")
+            c = input_text.strip().upper()
+            if len(c) != 10:
+                await loading.edit_text("❌ **Invalid PAN number.**\n\nSend 10-char PAN (e.g. `ABCDE1234F`)")
+                return
+            api_tmpl = get_api_url('pan')
+            url = build_api_url(api_tmpl, c) if ("{input}" in api_tmpl or "{pan}" in api_tmpl or "{}" in api_tmpl) else f"{api_tmpl}{c}"
+            r = await async_fetch(url, timeout=20)
             try: d = r.json()
             except: d = {"raw_response": r.text}
-            if isinstance(d, dict): d = apply_json_add(clean_response_data(d, lookup_type), lookup_type)
-            fj = json.dumps(d, indent=2); rt = f"💳 **PAN CARD**\n\n```json\n{fj}\n```{powered_by_text()}"
+            if isinstance(d, dict):
+                if (d.get("error") or d.get("status") in (False, "error", "fail", "failed")) and not d.get("data"):
+                    err_msg = d.get("error") or d.get("message") or "PAN not found."
+                    if isinstance(d.get("raw_response"), str):
+                        try:
+                            sub = json.loads(d["raw_response"])
+                            err_msg = sub.get("data", {}).get("errors", [{}])[0].get("message", err_msg)
+                        except: pass
+                    await loading.edit_text(f"⚠️ **PAN Not Found** for `{c}`\n\n_{err_msg}_")
+                    return
+                if "data" in d and isinstance(d["data"], dict):
+                    d["data"] = apply_json_add(clean_response_data(d["data"], lookup_type), lookup_type)
+                d = apply_json_add(clean_response_data(d, lookup_type), lookup_type)
+            if not _has_real_data(d):
+                await loading.edit_text(f"⚠️ **No data found** for `{c}`")
+                return
+            fj = json.dumps(d, indent=2); rt = f"💳 **PAN CARD**\n🆔 `{c}`\n\n```json\n{fj}\n```{powered_by_text()}"
         elif lookup_type == "phone":
             mode = prefix_modes.get("phone", "without_91")
             c = normalize_phone(input_text, mode)
