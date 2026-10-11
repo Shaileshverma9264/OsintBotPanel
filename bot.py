@@ -1,7 +1,11 @@
 import io, re, zipfile, threading, json, os, time, logging, aiohttp, asyncio, random, string
-from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta, timezone
+try:
+    from zoneinfo import ZoneInfo
+    IST = ZoneInfo("Asia/Kolkata")
+except Exception:
+    IST = timezone(timedelta(hours=5, minutes=30))
 from bs4 import BeautifulSoup
-from datetime import datetime, timedelta
 from flask import Flask
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, ChatMemberHandler, filters, ContextTypes
@@ -15,7 +19,6 @@ DEVELOPER_NAME = "@skyler"
 RAW_ADMIN = os.getenv("ADMIN_IDS", "1134471909")
 ADMIN_IDS = [int(x.strip()) for x in RAW_ADMIN.split(",") if x.strip().isdigit()]
 RESTRICTED_IDS = []
-IST = ZoneInfo("Asia/Kolkata")
 
 DEFAULT_APIS = {
     "phone": "https://api.sarkariallupdates.com/api?=num_to_info&key=key_f9f441d2400cd0d9&num=",
@@ -521,9 +524,9 @@ def get_user_data(user_id, name=None):
 def add_credits(user_id, amount):
     data = load_data(); uid = str(user_id)
     if uid not in data: data[uid] = {"name": "Unknown", "bomb_credits": 0, "username": None}
-    data[uid]["bomb_credits"] = data[uid].get("bomb_credits", 0) + amount; save_data(data)
-    a = load_approved(); a.add(int(user_id)); save_approved(a)
+    data[uid]["bomb_credits"] = max(0, data[uid].get("bomb_credits", 0) + amount); save_data(data)
     p = load_pending(); p.discard(int(user_id)); save_pending(p)
+    remove_premium_pending(user_id)
 
 def remove_credits(user_id, amount=None):
     data = load_data(); uid = str(user_id)
@@ -531,6 +534,12 @@ def remove_credits(user_id, amount=None):
         if amount is None: data[uid]["bomb_credits"] = 0
         else: data[uid]["bomb_credits"] = max(0, data[uid].get("bomb_credits", 0) - amount)
         save_data(data)
+    if amount is None or get_credits(user_id) <= 0:
+        a = load_approvals()
+        if uid not in a or not a[uid].get("approved"):
+            ap = load_approved()
+            if int(user_id) in ap:
+                ap.discard(int(user_id)); save_approved(ap)
 
 def get_credits(user_id): return load_data().get(str(user_id), {}).get("bomb_credits", 0)
 
@@ -761,7 +770,7 @@ def is_menu_button(text):
 
 def clear_user_pending_actions(context):
     keys = [
-        "admin_action", "credit_targets", "approve_duration", "block_targets",
+        "admin_action", "credit_targets", "credit_remove_targets", "approve_duration", "block_targets",
         "notes_target", "lookup_type", "bomb_mode", "awaiting_redeem",
         "pay_new_name", "pay_new_value", "pay_new_emoji", "pay_new_note",
         "plan_label", "plan_price", "redeem_credits", "replace_api_target",
@@ -1955,10 +1964,10 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.edit_message_text("📝 Send User ID:", reply_markup=get_back_keyboard())
     elif data == "admin_addcredits":
         context.user_data["admin_action"] = "addcredits"
-        await q.edit_message_text("🎫 Send User ID(s):", reply_markup=get_back_keyboard())
+        await q.edit_message_text("➕ **ADD CREDITS**\n━━━━━━━━━━━━━━━━━━━━━━\nSend `User_ID Amount` (e.g. `123456789 10`)\nOr send just User ID(s):", reply_markup=get_back_keyboard())
     elif data == "admin_removecredits":
         context.user_data["admin_action"] = "removecredits_id"
-        await q.edit_message_text("🗑️ Send User ID(s):", reply_markup=get_back_keyboard())
+        await q.edit_message_text("🗑️ **REMOVE CREDITS**\n━━━━━━━━━━━━━━━━━━━━━━\nSend `User_ID Amount` (e.g. `123456789 5`)\nOr send `User_ID all` to remove all\nOr send just User ID(s):", reply_markup=get_back_keyboard())
     elif data == "admin_credits_list":
         all_data = load_data(); users = load_all_users()
         lines = ["💳 **CREDITS**\n"]; count = 0
@@ -1968,7 +1977,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 count += 1; au = users.get(us, {})
                 lines.append(f"{count}. `{us}` – {au.get('full_name') or ud.get('name','Unknown')} – 💳 `{c}`\n")
         txt = "\n".join(lines) if count > 0 else "📭 None."
-        await q.edit_message_text(txt, parse_mode="Markdown", reply_markup=get_back_keyboard())
+        await q.edit_message_text(txt[:4000], parse_mode="Markdown", reply_markup=get_back_keyboard())
     elif data == "admin_user_details":
         context.user_data["admin_action"] = "user_details"
         await q.edit_message_text("👤 Send User ID:", reply_markup=get_back_keyboard())
@@ -2853,6 +2862,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await reply_message(update, context, f"✅ Unblocked `{len(ids)}`."); return
         elif a == "addcredits":
             if not context.user_data.get("credit_targets"):
+                tokens = text.strip().split()
+                if len(tokens) == 2 and tokens[0].isdigit() and tokens[1].isdigit():
+                    tid = int(tokens[0]); amt = int(tokens[1])
+                    context.user_data.pop("admin_action", None)
+                    add_credits(tid, amt)
+                    try: await context.bot.send_message(chat_id=tid, text=f"🎉 +{amt} credits! Balance: `{get_credits(tid)}`")
+                    except: pass
+                    await reply_message(update, context, f"✅ Added `{amt}` credits to `{tid}`. Balance: `{get_credits(tid)}`")
+                    return
                 ids = re.findall(r'\d+', text)
                 if not ids:
                     context.user_data.pop("admin_action", None)
@@ -2874,9 +2892,52 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await reply_message(update, context, "❌ Invalid amount. Action cancelled.")
             return
         elif a == "removecredits_id":
-            context.user_data.pop("admin_action"); ids = re.findall(r'\d+', text)
-            for tid in ids: remove_credits(int(tid), None)
-            await reply_message(update, context, f"🗑️ Removed from `{len(ids)}`."); return
+            if not context.user_data.get("credit_remove_targets"):
+                tokens = text.strip().split()
+                if len(tokens) == 2 and tokens[0].isdigit():
+                    tid = int(tokens[0]); arg2 = tokens[1].lower()
+                    context.user_data.pop("admin_action", None)
+                    if arg2 == "all":
+                        remove_credits(tid, None)
+                        try: await context.bot.send_message(chat_id=tid, text=f"⚠️ All credits removed. Balance: `0`")
+                        except: pass
+                        await reply_message(update, context, f"🗑️ Removed all credits from `{tid}`. Balance: `0`")
+                    elif arg2.isdigit():
+                        amt = int(arg2)
+                        remove_credits(tid, amt)
+                        try: await context.bot.send_message(chat_id=tid, text=f"⚠️ -{amt} credits deducted. Balance: `{get_credits(tid)}`")
+                        except: pass
+                        await reply_message(update, context, f"🗑️ Removed `{amt}` credits from `{tid}`. Balance: `{get_credits(tid)}`")
+                    else:
+                        await reply_message(update, context, "❌ Invalid amount. Send a number or `all`.")
+                    return
+                ids = re.findall(r'\d+', text)
+                if not ids:
+                    context.user_data.pop("admin_action", None)
+                    await reply_message(update, context, "❌ No IDs found. Action cancelled.")
+                    return
+                context.user_data["credit_remove_targets"] = ids
+                await reply_message(update, context, "🎫 Send amount to remove (or send `all` to clear all credits):")
+            else:
+                context.user_data.pop("admin_action", None)
+                ids = context.user_data.pop("credit_remove_targets", [])
+                val = text.strip().lower()
+                if val == "all":
+                    for tid in ids:
+                        t = int(tid); remove_credits(t, None)
+                        try: await context.bot.send_message(chat_id=t, text=f"⚠️ All credits removed. Balance: `0`")
+                        except: pass
+                    await reply_message(update, context, f"🗑️ Removed all credits from `{len(ids)}` user(s).")
+                elif val.isdigit():
+                    amt = int(val)
+                    for tid in ids:
+                        t = int(tid); remove_credits(t, amt)
+                        try: await context.bot.send_message(chat_id=t, text=f"⚠️ -{amt} credits deducted. Balance: `{get_credits(t)}`")
+                        except: pass
+                    await reply_message(update, context, f"🗑️ Removed `{amt}` credits from `{len(ids)}` user(s).")
+                else:
+                    await reply_message(update, context, "❌ Invalid amount. Action cancelled.")
+            return
         elif a == "user_details" and text.isdigit():
             context.user_data.pop("admin_action"); t = int(text)
             ud2 = get_user_data(t); au = load_all_users().get(str(t), {}); a_info = load_approvals().get(str(t), {})
@@ -3013,9 +3074,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if len(phone) < 10: await reply_message(update, context, "❌ 10-digit required."); return
         if uid in active_bombs: await reply_message(update, context, "⏳ Already bombing."); return
         if not perm:
-            if ud["bomb_credits"] <= 0:
+            if get_credits(uid) <= 0:
                 await show_approval_required(update); return
-            ud["bomb_credits"] -= 1; save_data(load_data()); left = ud["bomb_credits"]
+            remove_credits(uid, 1); left = get_credits(uid)
         else: left = "∞"
         track_button_use("bomb")
         msg = await reply_message(update, context, f"💣 **BOMB ACTIVATED**\n📞 `{phone}`\n🎫 Left: `{left}`\n\n⏳ Press **🛑 Stop Bomb**", reply_markup=get_stop_keyboard())
@@ -3101,7 +3162,11 @@ async def approval_cleanup_loop():
         await asyncio.sleep(3600)
 
 async def post_init(application: Application):
-    await application.bot.set_my_commands([BotCommand("start", "Launch bot"), BotCommand("addcredits", "Admin: Add credits")])
+    await application.bot.set_my_commands([
+        BotCommand("start", "Launch bot"),
+        BotCommand("addcredits", "Admin: Add credits"),
+        BotCommand("removecredits", "Admin: Remove credits"),
+    ])
     await get_aio_session(); asyncio.create_task(approval_cleanup_loop())
     logger.info("✅ Leak Detector Bot initialized")
 
@@ -3119,11 +3184,44 @@ def run_flask():
 async def addcredits_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     if not is_admin(uid): return
-    if len(context.args) < 2: await reply_message(update, context, "⚠️ `/addcredits <id> <amt>`"); return
+    if len(context.args) < 2: await reply_message(update, context, "ℹ️ Usage: `/addcredits <id> <amt>`"); return
     try:
         t = int(context.args[0]); a = int(context.args[1]); add_credits(t, a)
+        try: await context.bot.send_message(chat_id=t, text=f"🎉 +{a} credits! Balance: `{get_credits(t)}`")
+        except: pass
         await reply_message(update, context, f"✅ +`{a}` → `{t}`. Balance: `{get_credits(t)}`")
-    except: await reply_message(update, context, "❌ Invalid.")
+    except: await reply_message(update, context, "❌ Invalid input.")
+
+async def removecredits_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    if not is_admin(uid): return
+    if len(context.args) < 1:
+        await reply_message(update, context, "ℹ️ Usage: `/removecredits <id> [amt/all]`")
+        return
+    try:
+        t = int(context.args[0])
+        if len(context.args) >= 2:
+            arg = context.args[1].lower()
+            if arg == "all":
+                remove_credits(t, None)
+                try: await context.bot.send_message(chat_id=t, text=f"⚠️ All credits removed. Balance: `0`")
+                except: pass
+                await reply_message(update, context, f"🗑️ Removed all credits from `{t}`. Balance: `0`")
+            elif arg.isdigit():
+                amt = int(arg)
+                remove_credits(t, amt)
+                try: await context.bot.send_message(chat_id=t, text=f"⚠️ -{amt} credits deducted. Balance: `{get_credits(t)}`")
+                except: pass
+                await reply_message(update, context, f"🗑️ -`{amt}` credits from `{t}`. Balance: `{get_credits(t)}`")
+            else:
+                await reply_message(update, context, "❌ Invalid amount. Send a number or `all`.")
+        else:
+            remove_credits(t, None)
+            try: await context.bot.send_message(chat_id=t, text=f"⚠️ All credits removed. Balance: `0`")
+            except: pass
+            await reply_message(update, context, f"🗑️ Removed all credits from `{t}`. Balance: `0`")
+    except:
+        await reply_message(update, context, "❌ Invalid user ID.")
 
 # ==================== MAIN ====================
 def main():
@@ -3131,6 +3229,7 @@ def main():
     application = (Application.builder().token(BOT_TOKEN).post_init(post_init).post_shutdown(post_shutdown).concurrent_updates(True).build())
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("addcredits", addcredits_command))
+    application.add_handler(CommandHandler("removecredits", removecredits_command))
     application.add_handler(ChatMemberHandler(on_my_chat_member, ChatMemberHandler.MY_CHAT_MEMBER))
     application.add_handler(CallbackQueryHandler(verify_callback, pattern="^verify_join$"))
     application.add_handler(CallbackQueryHandler(rc_download_callback, pattern="^rcdl_"))
