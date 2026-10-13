@@ -165,9 +165,9 @@ def save_redeem_codes(d): save_json(REDEEM_FILE, d)
 def load_config():
     cfg = load_json(CONFIG_FILE, {})
     defaults = {
-        "owner_username": "DarkWorld233",
+        "owner_username": "Skyler7565",
         "owner_display": "𝔻𝕒̼𝕣̼𝕜̼ℙ̼𝕝̼𝕦̼𝕤̼𝕖̼𝟜̼𝟜̼𝟜̼☠",
-        "owner2_username": "Hittadmin",
+        "owner2_username": "Skyler7565",
         "owner2_display": "█▬█ █ ▀█▀-ADMIN",
         "owner2_id": 8761086213,
         "default_credits": 5,
@@ -185,9 +185,9 @@ def load_prefix_modes():
     merged = dict(DEFAULT_PREFIX_MODES); merged.update(d); return merged
 def save_prefix_modes(d): save_json(PREFIX_MODES_FILE, d)
 
-def get_owner_username(): return load_config().get("owner_username", "DarkWorld233")
+def get_owner_username(): return load_config().get("owner_username", "Skyler7565")
 def get_owner_display(): return load_config().get("owner_display", "𝔻𝕒̼𝕣̼𝕜̼ℙ̼𝕝̼𝕦̼𝕤̼𝕖̼𝟜̼𝟜̼𝟜̼☠")
-def get_owner2_username(): return load_config().get("owner2_username", "Hittadmin")
+def get_owner2_username(): return load_config().get("owner2_username", "Skyler7565")
 def get_owner2_display(): return load_config().get("owner2_display", "█▬█ █ ▀█▀-ADMIN")
 def get_default_credits(): return int(load_config().get("default_credits", 5))
 def get_referral_credits(): return int(load_config().get("referral_credits", 3))
@@ -398,14 +398,22 @@ def check_flood(uid, query):
     ud["queries"] = queries; ud.pop("blocked_until", None); flood[uid_str] = ud; save_flood(flood); return False
 
 # ==================== HIDDEN FIELDS ====================
-DEFAULT_HIDDEN = ["req_left","req_total","expiry","cached","cache","credit","credits","note","notes","support","description","desc","title","website","site","status","buy apis","buy_apis","buy","developer","Developer","DEVELOPER","owner","Owner","OWNER","author","Author","AUTHOR","developer name","powered by","Powered By","Powered by","apikey","api_key","API Key","API_KEY","viraj","Viraj","viraj_prajapati","Viraj_Prajapati","abhigyan","Abhigyan","dark-info.site","hittadmin","hittadmin","success_count","fail_count","error_count","inputed number","Inputed Number"]
-_DEFAULT_HIDDEN_SET = set(DEFAULT_HIDDEN)
+DEFAULT_HIDDEN = [
+    "req_left","req_total","expiry","cached","cache","credit","credits","note","notes","support",
+    "description","desc","title","website","site","status","buy apis","buy_apis","buy","developer",
+    "Developer","DEVELOPER","owner","Owner","OWNER","author","Author","AUTHOR","developer name",
+    "powered by","Powered By","Powered by","apikey","api_key","API Key","API_KEY","viraj","Viraj",
+    "viraj_prajapati","Viraj_Prajapati","abhigyan","Abhigyan","dark-info.site","hittadmin","success_count",
+    "fail_count","error_count","inputed number","Inputed Number"
+]
 
 def load_hidden_fields():
     data = load_json(HIDDEN_FIELDS_FILE, None)
-    if data is None: save_json(HIDDEN_FIELDS_FILE, DEFAULT_HIDDEN); return set(DEFAULT_HIDDEN)
-    return set(data) | _DEFAULT_HIDDEN_SET
-def save_hidden_fields(d): save_json(HIDDEN_FIELDS_FILE, list(d))
+    if data is None:
+        save_json(HIDDEN_FIELDS_FILE, DEFAULT_HIDDEN)
+        return set(DEFAULT_HIDDEN)
+    return set(data)
+def save_hidden_fields(d): save_json(HIDDEN_FIELDS_FILE, sorted(list(d)))
 
 def load_per_button():
     d = load_json(PER_BUTTON_FILE, None) or {}
@@ -416,8 +424,60 @@ def save_per_button(d): save_json(PER_BUTTON_FILE, d)
 def get_button_hidden_fields(b): return load_per_button().get("hidden", {}).get(b, [])
 def set_button_hidden_field(b, f):
     d = load_per_button(); d.setdefault("hidden", {}).setdefault(b, [])
-    if f not in d["hidden"][b]: d["hidden"][b].append(f)
-    save_per_button(d)
+    f_clean = f.strip()
+    if not f_clean: return
+    existing = [x.lower() for x in d["hidden"][b]]
+    if f_clean.lower() not in existing:
+        d["hidden"][b].append(f_clean)
+        save_per_button(d)
+
+def remove_button_hidden_field(b, f):
+    d = load_per_button()
+    f_clean = f.strip().lower()
+    if not f_clean: return False
+    btn_hidden = d.get("hidden", {})
+    if b in btn_hidden:
+        new_list = [x for x in btn_hidden[b] if x.strip().lower() != f_clean]
+        if len(new_list) != len(btn_hidden[b]):
+            if new_list:
+                btn_hidden[b] = new_list
+            else:
+                btn_hidden.pop(b, None)
+            save_per_button(d)
+            return True
+    return False
+
+def remove_hidden_field_everywhere(field_name):
+    target = field_name.strip().lower()
+    if not target: return []
+    removed_places = []
+    # 1. Global hidden fields
+    h = load_hidden_fields()
+    matched_global = [x for x in h if x.strip().lower() == target]
+    if matched_global:
+        for m in matched_global:
+            h.discard(m)
+        save_hidden_fields(h)
+        removed_places.append("Global")
+
+    # 2. Per-button hidden fields
+    d = load_per_button()
+    btn_hidden = d.get("hidden", {})
+    pb_modified = False
+    for btn, flds in list(btn_hidden.items()):
+        new_flds = [x for x in flds if x.strip().lower() != target]
+        if len(new_flds) != len(flds):
+            pb_modified = True
+            disp = LOOKUP_TO_DISPLAY.get(btn, btn) if "LOOKUP_TO_DISPLAY" in globals() else btn
+            removed_places.append(f"Button `{disp}`")
+            if new_flds:
+                btn_hidden[btn] = new_flds
+            else:
+                btn_hidden.pop(btn, None)
+    if pb_modified:
+        save_per_button(d)
+
+    return removed_places
 def get_button_add_word(b): return load_per_button().get("add_words", {}).get(b, "")
 def set_add_word(b, t): d = load_per_button(); d.setdefault("add_words", {})[b] = t; save_per_button(d)
 def remove_add_word(b):
@@ -944,6 +1004,8 @@ def button_selector_keyboard(prefix):
 
 # ==================== CLEANER ====================
 def clean_response_data(data, button=None):
+    if isinstance(data, list):
+        return [clean_response_data(item, button) for item in data if item is not None]
     if not isinstance(data, dict): return data
     hidden = {h.lower().strip() for h in load_hidden_fields()}
     if button: hidden.update({h.lower().strip() for h in get_button_hidden_fields(button)})
@@ -978,9 +1040,9 @@ def apply_json_add(data, button):
 # ==================== APPROVAL REQUIRED ====================
 async def show_approval_required(update):
     cfg = load_config()
-    owner1_uname = cfg.get("owner_username", "DarkWorld233")
+    owner1_uname = cfg.get("owner_username", "Skyler7565")
     owner1_disp = cfg.get("owner_display", "Owner 1")
-    owner2_uname = cfg.get("owner2_username", "Hittadmin")
+    owner2_uname = cfg.get("owner2_username", "Skyler7565")
     owner2_disp = cfg.get("owner2_display", "█▬█ █ ▀█▀-ADMIN")
     pay = load_payment()
     pay_block = build_payment_message()
@@ -1434,8 +1496,8 @@ async def ipaid_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     add_premium_pending(uid, user.username, user.full_name)
 
     cfg = load_config()
-    owner1_uname = cfg.get("owner_username", "DarkWorld233")
-    owner2_uname = cfg.get("owner2_username", "Hittadmin")
+    owner1_uname = cfg.get("owner_username", "Skyler7565")
+    owner2_uname = cfg.get("owner2_username", "Skyler7565")
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("💬 Contact Owner 1", url=f"https://t.me/{owner1_uname}")],
         [InlineKeyboardButton("💬 Contact Owner 2", url=f"https://t.me/{owner2_uname}")],
@@ -2045,10 +2107,10 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.edit_message_text(f"🔧 Maintenance: **{'🛠️ ON' if mt['enabled'] else '✅ OFF'}**", parse_mode="Markdown", reply_markup=get_cached_menu())
     elif data == "admin_set_owner_username":
         cfg = load_config(); context.user_data["admin_action"] = "set_owner_username"
-        await q.edit_message_text(f"👤 **SET OWNER 1 USERNAME**\n\nCurrent: `@{cfg.get('owner_username','DarkWorld233')}`\n\nSend new username without @:", parse_mode="Markdown", reply_markup=get_back_keyboard())
+        await q.edit_message_text(f"👤 **SET OWNER 1 USERNAME**\n\nCurrent: `@{cfg.get('owner_username','Skyler7565')}`\n\nSend new username without @:", parse_mode="Markdown", reply_markup=get_back_keyboard())
     elif data == "admin_set_owner2_username":
         cfg = load_config(); context.user_data["admin_action"] = "set_owner2_username"
-        await q.edit_message_text(f"👤 **SET OWNER 2 USERNAME**\n\nCurrent: `@{cfg.get('owner2_username','Hittadmin')}`\n\nSend new username without @:", parse_mode="Markdown", reply_markup=get_back_keyboard())
+        await q.edit_message_text(f"👤 **SET OWNER 2 USERNAME**\n\nCurrent: `@{cfg.get('owner2_username','Skyler7565')}`\n\nSend new username without @:", parse_mode="Markdown", reply_markup=get_back_keyboard())
     elif data == "admin_set_welcome":
         w = load_welcome(); context.user_data["admin_action"] = "set_welcome"
         await q.edit_message_text(f"👋 **Welcome**\n\nStatus: `{'✅ ON' if w.get('enabled') else '🚫 OFF'}`\nMsg: `{w.get('message','')[:100]}`\n\nSend new (or `off`):", parse_mode="Markdown", reply_markup=get_back_keyboard())
@@ -2179,19 +2241,71 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.edit_message_text("✏️ Select:", reply_markup=button_selector_keyboard("setprompt"))
     elif data == "admin_hide_field":
         context.user_data["admin_action"] = "hide_field_select"
-        await q.edit_message_text("🙈 Select:", reply_markup=button_selector_keyboard("hidefield"))
+        await q.edit_message_text(
+            "🙈 **HIDE FIELD**\n━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Select which button's responses to hide fields for, or select **GLOBAL (all)** to hide across all buttons:",
+            parse_mode="Markdown",
+            reply_markup=button_selector_keyboard("hidefield")
+        )
     elif data == "admin_unhide_field":
         h = load_hidden_fields(); pb = load_per_button()
-        txt = "👁️ **Global Hidden:**\n" + ("\n".join([f"• `{x}`" for x in h]) if h else "None") + "\n\n📌 **Per-Button:**\n"
-        for btn, flds in pb.get("hidden", {}).items(): txt += f"• `{btn}`: {', '.join(f'`{f}`' for f in flds)}\n"
-        txt += "\n\n_Send field name to unhide:_"
+        txt = "👁️ **UNHIDE FIELD MANAGER**\n━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        if h:
+            sorted_h = sorted(list(h))
+            txt += f"🙈 **Global Hidden ({len(sorted_h)}):**\n"
+            txt += ", ".join(f"`{x}`" for x in sorted_h) + "\n\n"
+        else:
+            txt += "🙈 **Global Hidden:** None\n\n"
+
+        btn_hidden = pb.get("hidden", {})
+        has_pb = any(flds for flds in btn_hidden.values())
+        if has_pb:
+            txt += "📌 **Per-Button Hidden:**\n"
+            for btn, flds in btn_hidden.items():
+                if flds:
+                    disp = LOOKUP_TO_DISPLAY.get(btn, btn)
+                    txt += f"• **{disp}** (`{btn}`): {', '.join(f'`{f}`' for f in flds)}\n"
+            txt += "\n"
+        else:
+            txt += "📌 **Per-Button Hidden:** None\n\n"
+
+        txt += "━━━━━━━━━━━━━━━━━━━━━━\n"
+        txt += "✏️ **Send field name to unhide**\n"
+        txt += "💡 _Multiple fields: `fld1, fld2`_\n"
+        txt += "💡 _Specific button: `button:field` (e.g. `phone:mobile`)_\n"
+        txt += "💡 _Send `reset_default` to restore defaults._\n"
+        txt += "💡 _Send `clear_all` to unhide everything._"
+
         context.user_data["admin_action"] = "unhide_field"
-        await q.edit_message_text(txt[:4000], parse_mode="Markdown", reply_markup=get_back_keyboard())
+        try:
+            await q.edit_message_text(txt[:4000], parse_mode="Markdown", reply_markup=get_back_keyboard())
+        except Exception:
+            await q.edit_message_text(txt[:4000], reply_markup=get_back_keyboard())
     elif data == "admin_list_hidden":
         h = load_hidden_fields(); pb = load_per_button()
-        txt = "🙈 **Global:**\n" + ("\n".join([f"• `{x}`" for x in h]) if h else "None") + "\n\n📌 **Per-Button:**\n"
-        for btn, flds in pb.get("hidden", {}).items(): txt += f"• `{btn}`: {', '.join(f'`{f}`' for f in flds)}\n"
-        await q.edit_message_text(txt[:4000], parse_mode="Markdown", reply_markup=get_back_keyboard())
+        txt = "📋 **ALL HIDDEN FIELDS**\n━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        if h:
+            sorted_h = sorted(list(h))
+            txt += f"🙈 **Global Hidden ({len(sorted_h)}):**\n"
+            txt += ", ".join(f"`{x}`" for x in sorted_h) + "\n\n"
+        else:
+            txt += "🙈 **Global Hidden:** None\n\n"
+
+        btn_hidden = pb.get("hidden", {})
+        has_pb = any(flds for flds in btn_hidden.values())
+        if has_pb:
+            txt += "📌 **Per-Button Hidden:**\n"
+            for btn, flds in btn_hidden.items():
+                if flds:
+                    disp = LOOKUP_TO_DISPLAY.get(btn, btn)
+                    txt += f"• **{disp}** (`{btn}`): {', '.join(f'`{f}`' for f in flds)}\n"
+        else:
+            txt += "📌 **Per-Button Hidden:** None\n"
+
+        try:
+            await q.edit_message_text(txt[:4000], parse_mode="Markdown", reply_markup=get_back_keyboard())
+        except Exception:
+            await q.edit_message_text(txt[:4000], reply_markup=get_back_keyboard())
     elif data == "admin_addword_global":
         context.user_data["admin_action"] = "set_global_addword"
         await q.edit_message_text("📝 Send text for ALL responses:", reply_markup=get_back_keyboard())
@@ -2338,8 +2452,17 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         dm = load_dm_mode(); dm["enabled"] = not dm.get("enabled", True); save_dm_mode(dm); invalidate_menu_cache()
         await q.edit_message_text(f"📩 DM: **{'✅ ON' if dm['enabled'] else '🚫 OFF'}**", parse_mode="Markdown", reply_markup=get_cached_menu())
     elif data.startswith("hidefield:"):
-        btn = data.split(":",1)[1]; context.user_data["hide_field_target"] = btn; context.user_data["admin_action"] = "hide_field_value"
-        await q.edit_message_text(f"🙈 Send field for `{btn}`:", reply_markup=get_back_keyboard())
+        btn = data.split(":", 1)[1]
+        context.user_data["hide_field_target"] = btn
+        context.user_data["admin_action"] = "hide_field_value"
+        target_name = "Global (All Buttons)" if btn == "__global__" else (LOOKUP_TO_DISPLAY.get(btn, btn) if "LOOKUP_TO_DISPLAY" in globals() else btn)
+        await q.edit_message_text(
+            f"🙈 **Hide Field for {target_name}** (`{btn}`)\n\n"
+            f"Send the field name(s) to hide in response output.\n\n"
+            f"💡 *You can send multiple fields separated by commas (e.g. `status, note, credit`)*:",
+            parse_mode="Markdown",
+            reply_markup=get_back_keyboard()
+        )
     elif data.startswith("addwordbtn:"):
         btn = data.split(":",1)[1]; context.user_data["addword_target"] = btn; context.user_data["admin_action"] = "set_button_addword"
         await q.edit_message_text(f"📝 Text for `{btn}`:", reply_markup=get_back_keyboard())
@@ -3005,10 +3128,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif a == "hide_field_value":
             target = context.user_data.pop("hide_field_target", None); context.user_data.pop("admin_action", None)
             if not target: return
+            raw_fields = [f.strip() for f in re.split(r'[,;\n]+', text) if f.strip()]
+            if not raw_fields:
+                await reply_message(update, context, "⚠️ No valid field names provided.")
+                return
             if target == "__global__":
-                h = load_hidden_fields(); h.add(text.strip()); save_hidden_fields(h); await reply_message(update, context, f"🙈 Hidden globally.")
+                h = load_hidden_fields()
+                for rf in raw_fields:
+                    h.add(rf)
+                save_hidden_fields(h)
+                added_str = ", ".join(f"`{f}`" for f in raw_fields)
+                await reply_message(update, context, f"🙈 **Hidden Globally:**\n{added_str}")
             else:
-                set_button_hidden_field(target, text.strip()); await reply_message(update, context, f"🙈 Hidden `{target}`.")
+                for rf in raw_fields:
+                    set_button_hidden_field(target, rf)
+                added_str = ", ".join(f"`{f}`" for f in raw_fields)
+                disp = LOOKUP_TO_DISPLAY.get(target, target) if "LOOKUP_TO_DISPLAY" in globals() else target
+                await reply_message(update, context, f"🙈 **Hidden for {disp} (`{target}`):**\n{added_str}")
             return
         elif a == "set_global_addword":
             context.user_data.pop("admin_action"); set_add_word("__global__", text); await reply_message(update, context, f"📝 Global:\n\n`{text}`"); return
@@ -3043,9 +3179,52 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not target: return
             protect_value(target, text); await reply_message(update, context, f"🛡️ Protected."); return
         elif a == "unhide_field":
-            context.user_data.pop("admin_action"); h = load_hidden_fields()
-            if text in h: h.discard(text); save_hidden_fields(h); await reply_message(update, context, f"👁️ `{text}` visible.")
-            else: await reply_message(update, context, "ℹ️ Not found.")
+            context.user_data.pop("admin_action", None)
+            cmd = text.strip().lower()
+            if cmd == "reset_default":
+                save_hidden_fields(DEFAULT_HIDDEN)
+                await reply_message(update, context, "🔄 **Hidden fields reset to defaults.**")
+                return
+            if cmd == "clear_all":
+                save_hidden_fields([])
+                pb = load_per_button()
+                pb["hidden"] = {}
+                save_per_button(pb)
+                await reply_message(update, context, "🗑️ **All hidden fields cleared! All fields are now visible.**")
+                return
+
+            raw_fields = [f.strip() for f in re.split(r'[,;\n]+', text) if f.strip()]
+            if not raw_fields:
+                await reply_message(update, context, "⚠️ Send field name(s) to unhide.")
+                return
+
+            unhidden_report = []
+            not_found_report = []
+
+            for rf in raw_fields:
+                if ":" in rf:
+                    b_part, f_part = rf.split(":", 1)
+                    b_part = b_part.strip()
+                    f_part = f_part.strip()
+                    if remove_button_hidden_field(b_part, f_part):
+                        disp = LOOKUP_TO_DISPLAY.get(b_part, b_part) if "LOOKUP_TO_DISPLAY" in globals() else b_part
+                        unhidden_report.append(f"`{f_part}` (from `{disp}`)")
+                    else:
+                        not_found_report.append(f"`{rf}`")
+                else:
+                    rem_places = remove_hidden_field_everywhere(rf)
+                    if rem_places:
+                        unhidden_report.append(f"`{rf}` (from {', '.join(rem_places)})")
+                    else:
+                        not_found_report.append(f"`{rf}`")
+
+            reply_parts = []
+            if unhidden_report:
+                reply_parts.append("👁️ **Unhidden successfully (now visible):**\n" + "\n".join(f"• {x}" for x in unhidden_report))
+            if not_found_report:
+                reply_parts.append("ℹ️ **Not found in hidden fields:**\n" + "\n".join(f"• {x}" for x in not_found_report))
+
+            await reply_message(update, context, "\n\n".join(reply_parts) or "ℹ️ No changes made.")
             return
         elif a == "add_forcejoin":
             context.user_data.pop("admin_action"); parts = [x.strip() for x in text.split("|")]
