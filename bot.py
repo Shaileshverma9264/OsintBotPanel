@@ -811,13 +811,13 @@ BUTTON_LOOKUP_MAP = {
 }
 BUTTON_LOOKUP_ALIASES = {
     "Advanced Osint Search": "vehicle2",
-    "🚗 Vehicle2 Lookup": "vehicle2",
+    "🚗 Advanced Osint Search": "osint",
 }
 LOOKUP_TO_DISPLAY = {v: k for k, v in BUTTON_LOOKUP_MAP.items()}
 
 ALL_MAIN_BUTTON_TEXTS = {
     "📱 Phone Lookup", "📱 Hi Tek", "🆔 Aadhar", "💳 PAN Lookup",
-    "🚗 Vehicle Lookup", "🔍 Advanced Osint Search", "Advanced Osint Search", "🚗 Vehicle2 Lookup", "💳 UPI Lookup",
+    "🚗 Vehicle Lookup", "🔍 Advanced Osint Search", "Advanced Osint Search", "🚗 Advanced Osint Search", "💳 UPI Lookup",
     "🕵️ Telegram ID Lookup", "🌍 IP Lookup", "🇵🇰 Pak Lookup",
     "👨‍👩‍👧 Family Lookup", "📸 Instagram Lookup", "🏢 GST Lookup",
     "📄 PAN to GST", "🏦 IFSC Lookup", "📡 Call Tower Lookup",
@@ -2834,7 +2834,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text in load_link_buttons() or
             text == "💣 Call/SMS Bomb" or
             text in ["📱 Phone Lookup", "📱 Hi Tek", "🆔 Aadhar", "💳 PAN Lookup",
-                     "🚗 Vehicle Lookup", "🔍 Advanced Osint Search", "Advanced Osint Search", "🚗 Vehicle2 Lookup", "💳 UPI Lookup",
+                     "🚗 Vehicle Lookup", "🔍 Advanced Osint Search", "Advanced Osint Search", "🚗 Advanced Osint Search", "💳 UPI Lookup",
                      "🕵️ Telegram ID Lookup", "🌍 IP Lookup", "🇵🇰 Pak Lookup",
                      "👨‍👩‍👧 Family Lookup", "📸 Instagram Lookup", "🏢 GST Lookup",
                      "📄 PAN to GST", "🏦 IFSC Lookup", "📡 Call Tower Lookup",
