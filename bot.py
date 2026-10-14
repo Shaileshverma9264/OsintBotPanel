@@ -24,7 +24,7 @@ DEFAULT_APIS = {
     "phone": "https://api.sarkariallupdates.com/api?=num_to_info&key=key_f9f441d2400cd0d9&num=",
     "hi_tek": "https://api.sarkariallupdates.com/api?=num_to_info&key=key_f9f441d2400cd0d9&num=",
     "pan": "https://api.sarkariallupdates.com/api?=pan2dob_name&key=30day&pan2dob_name=",
-    "vehicle": "API",
+    "vehicle": "https://api.sarkariallupdates.com/api?=vehicle_full&key=30day&xr=",
     "vehicle2": "API",
     "upi": "https://shuruuuuu-upi-basic-api-shuru-33.vercel.app/search?q=",
     "pak": "API",
@@ -336,9 +336,9 @@ async def async_fetch(url, headers=None, timeout=15):
 def _has_real_data(d):
     if not isinstance(d, dict) or not d: return False
     if d.get("status") in ("error", "fail", "failed", False) and not d.get("data"): return False
-    meta_keys = {'status','success','message','error','req_left','req_total','credit','credits','developer','note','notes','api','apikey','cached','cache','count','status_code'}
+    meta_keys = {'status','success','message','error','error_code','req_left','req_total','credit','credits','developer','note','notes','api','apikey','cached','cache','count','status_code','response_time_seconds','response_time'}
     for k, v in d.items():
-        if k.lower() in meta_keys: continue
+        if k.lower() in meta_keys or 'powered by' in k.lower(): continue
         if v in (None, '', [], {}, 0): continue
         if isinstance(v, str) and len(v.strip()) < 2: continue
         return True
@@ -558,6 +558,8 @@ def build_api_url(t, inp):
     if "{ifsc}" in t: return t.replace("{ifsc}", inp)
     if "{pan}" in t: return t.replace("{pan}", inp)
     if "{upi}" in t: return t.replace("{upi}", inp)
+    if "{rc}" in t: return t.replace("{rc}", inp)
+    if "{vehicle}" in t: return t.replace("{vehicle}", inp)
     tr = t.rstrip()
     if tr.endswith(('=', '&', '?/')): return tr + inp
     if re.search(r'[?&][^=&]+=$', tr): return tr + inp
@@ -1013,6 +1015,7 @@ def clean_response_data(data, button=None):
     cleaned = {}
     for k, v in data.items():
         if k.lower().strip() in hidden or k in ["N-A","n-a"] or "\u3164" in k: continue
+        if any(kw in k.lower() for kw in ["powered by", "apikey", "api key"]): continue
         if isinstance(v, str):
             if any(kw in v.lower() for kw in junk): continue
             cleaned[k] = v
@@ -1161,11 +1164,23 @@ async def perform_lookup(update, context, lookup_type, input_text):
         prefix_modes = load_prefix_modes()
         if lookup_type == "vehicle":
             rc = input_text.replace(" ", "").upper()
-            r = await async_fetch(f"{get_api_url('vehicle')}{rc}")
+            if not rc:
+                await loading.edit_text("❌ **Invalid RC number.**\n\nSend a valid RC number (e.g. `KL41V3504`).")
+                return
+            api_tmpl = get_api_url('vehicle')
+            url = build_api_url(api_tmpl, rc) if ("{input}" in api_tmpl or "{rc}" in api_tmpl or "{vehicle}" in api_tmpl or "{}" in api_tmpl) else f"{api_tmpl}{rc}"
+            r = await async_fetch(url, timeout=25)
             try: d = r.json()
             except: d = {"raw_response": r.text}
-            if isinstance(d, dict): d = apply_json_add(clean_response_data(d, lookup_type), lookup_type)
-            fj = json.dumps(d, indent=2); rt = f"🚗 **VEHICLE RC**\n\n```json\n{fj}\n```{powered_by_text()}"
+            if isinstance(d, dict):
+                if (d.get("success") is False or d.get("error") or d.get("error_code") or d.get("status") in (False, "error", "fail", "failed")) and not (d.get("registration_number") or d.get("owner_name") or d.get("chassis_number")):
+                    await loading.edit_text(f"⚠️ **Vehicle Not Found** for `{rc}`\n\n_Invalid RC number or details not available._")
+                    return
+                d = apply_json_add(clean_response_data(d, lookup_type), lookup_type)
+            if not _has_real_data(d):
+                await loading.edit_text(f"⚠️ **Vehicle Not Found** for `{rc}`\n\n_Invalid RC number or details not available._")
+                return
+            fj = json.dumps(d, indent=2); rt = f"🚗 **VEHICLE RC**\n🆔 `{rc}`\n\n```json\n{fj}\n```{powered_by_text()}"
         elif lookup_type == "vehicle2":
             rc = input_text.replace(" ", "").upper()
             r = await async_fetch(f"{get_api_url('vehicle2')}{rc}")
