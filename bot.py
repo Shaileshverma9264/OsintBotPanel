@@ -697,7 +697,7 @@ def build_features_list():
         "🆔 Aadhar": "🪪 Aadhaar Info",
         "💳 PAN Lookup": "💳 PAN Card Info",
         "🚗 Vehicle Lookup": "🚗 Vehicle Info",
-        "🔍 Advanced Osint Search": "🔍 Advanced OSINT Search",
+        "Advanced Osint Search": "🔍 Advanced OSINT Search",
         "💳 UPI Lookup": "⚡ UPI Info",
         "🕵️ Telegram ID Lookup": "🐙 Telegram OSINT",
         "🌍 IP Lookup": "🌍 IP Info",
@@ -775,7 +775,7 @@ def build_main_buttons(user_id):
     hidden = load_hidden_buttons()
     buttons = [
         ["📱 Phone Lookup", "📱 Hi Tek"], ["🆔 Aadhar", "💳 PAN Lookup"],
-        ["🚗 Vehicle Lookup", "🔍 Advanced Osint Search"], ["💳 UPI Lookup", "🕵️ Telegram ID Lookup"],
+        ["🚗 Vehicle Lookup", "Advanced Osint Search"], ["💳 UPI Lookup", "🕵️ Telegram ID Lookup"],
         ["🌍 IP Lookup", "🇵🇰 Pak Lookup"], ["👨‍👩‍👧 Family Lookup", "📸 Instagram Lookup"],
         ["🏢 GST Lookup", "📄 PAN to GST"], ["🏦 IFSC Lookup", "📡 Call Tower Lookup"],
         ["📄 RC to PDF"],
@@ -803,21 +803,23 @@ def get_keyboard(user_id): return get_user_keyboard(user_id)
 
 BUTTON_LOOKUP_MAP = {
     "📱 Phone Lookup": "phone", "📱 Hi Tek": "hi_tek", "🆔 Aadhar": "aadhar",
-    "💳 PAN Lookup": "pan", "🚗 Vehicle Lookup": "vehicle", "🔍 Advanced Osint Search": "vehicle2",
+    "💳 PAN Lookup": "pan", "🚗 Vehicle Lookup": "vehicle", "Advanced Osint Search": "vehicle2",
     "💳 UPI Lookup": "upi", "🕵️ Telegram ID Lookup": "tg", "🌍 IP Lookup": "ip",
     "🇵🇰 Pak Lookup": "pak", "👨‍👩‍👧 Family Lookup": "family", "📸 Instagram Lookup": "instagram",
     "🏢 GST Lookup": "gst", "📄 PAN to GST": "pan_to_gst", "🏦 IFSC Lookup": "ifsc",
     "📡 Call Tower Lookup": "tower", "📄 RC to PDF": "rc_pdf",
 }
 BUTTON_LOOKUP_ALIASES = {
-    "Advanced Osint Search": "vehicle2",
-    "🚗 Advanced Osint Search": "osint",
+    "🔍 Advanced Osint Search": "vehicle2",
+    "🚗 Vehicle2 Lookup": "vehicle2",
+    "Vehicle2 Lookup": "vehicle2",
+    "🚗 Advanced Osint Search": "vehicle2",
 }
 LOOKUP_TO_DISPLAY = {v: k for k, v in BUTTON_LOOKUP_MAP.items()}
 
 ALL_MAIN_BUTTON_TEXTS = {
     "📱 Phone Lookup", "📱 Hi Tek", "🆔 Aadhar", "💳 PAN Lookup",
-    "🚗 Vehicle Lookup", "🔍 Advanced Osint Search", "Advanced Osint Search", "🚗 Advanced Osint Search", "💳 UPI Lookup",
+    "🚗 Vehicle Lookup", "Advanced Osint Search", "🔍 Advanced Osint Search", "🚗 Vehicle2 Lookup", "Vehicle2 Lookup", "🚗 Advanced Osint Search", "💳 UPI Lookup",
     "🕵️ Telegram ID Lookup", "🌍 IP Lookup", "🇵🇰 Pak Lookup",
     "👨‍👩‍👧 Family Lookup", "📸 Instagram Lookup", "🏢 GST Lookup",
     "📄 PAN to GST", "🏦 IFSC Lookup", "📡 Call Tower Lookup",
@@ -1485,7 +1487,8 @@ async def perform_lookup(update, context, lookup_type, input_text):
     log_query(user_id, user.first_name, lookup_type, input_text)
     final_rt = remaining_credit_msg + rt
     if len(final_rt) > 4000:
-        fd = io.BytesIO(fj.encode('utf-8')); fd.name = f"{lookup_type}.txt"
+        rep_name = "advanced_osint_search" if lookup_type == "vehicle2" else lookup_type
+        fd = io.BytesIO(fj.encode('utf-8')); fd.name = f"{rep_name}.txt"
         await loading.delete()
         await update.message.reply_document(document=fd, caption=f"{remaining_credit_msg}📄 Report", parse_mode="Markdown")
     else: await loading.edit_text(final_rt, parse_mode="Markdown", disable_web_page_preview=True)
@@ -2834,7 +2837,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text in load_link_buttons() or
             text == "💣 Call/SMS Bomb" or
             text in ["📱 Phone Lookup", "📱 Hi Tek", "🆔 Aadhar", "💳 PAN Lookup",
-                     "🚗 Vehicle Lookup", "🔍 Advanced Osint Search", "Advanced Osint Search", "🚗 Advanced Osint Search", "💳 UPI Lookup",
+                     "🚗 Vehicle Lookup", "Advanced Osint Search", "🔍 Advanced Osint Search", "🚗 Vehicle2 Lookup", "Vehicle2 Lookup", "🚗 Advanced Osint Search", "💳 UPI Lookup",
                      "🕵️ Telegram ID Lookup", "🌍 IP Lookup", "🇵🇰 Pak Lookup",
                      "👨‍👩‍👧 Family Lookup", "📸 Instagram Lookup", "🏢 GST Lookup",
                      "📄 PAN to GST", "🏦 IFSC Lookup", "📡 Call Tower Lookup",
