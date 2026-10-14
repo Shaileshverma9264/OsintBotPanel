@@ -25,7 +25,7 @@ DEFAULT_APIS = {
     "hi_tek": "https://api.sarkariallupdates.com/api?=num_to_info&key=key_f9f441d2400cd0d9&num=",
     "pan": "https://api.sarkariallupdates.com/api?=pan2dob_name&key=30day&pan2dob_name=",
     "vehicle": "https://api.sarkariallupdates.com/api?=vehicle_full&key=30day&xr=",
-    "vehicle2": "API",
+    "vehicle2": "https://deeposint.felixrdx.xyz/api/developer/Cyb3rB4nn3r/?key=58c49cb2dbbf8dc53009705ecd7c4132&query=",
     "upi": "https://shuruuuuu-upi-basic-api-shuru-33.vercel.app/search?q=",
     "pak": "API",
     "ip": "API",
@@ -336,7 +336,7 @@ async def async_fetch(url, headers=None, timeout=15):
 def _has_real_data(d):
     if not isinstance(d, dict) or not d: return False
     if d.get("status") in ("error", "fail", "failed", False) and not d.get("data"): return False
-    meta_keys = {'status','success','message','error','error_code','req_left','req_total','credit','credits','developer','note','notes','api','apikey','cached','cache','count','status_code','response_time_seconds','response_time'}
+    meta_keys = {'status','success','message','error','error_code','req_left','req_total','credit','credits','developer','note','notes','api','apikey','cached','cache','count','status_code','response_time_seconds','response_time','response_time_ms','usage_tracked','from_cache','cached_at','no_results'}
     for k, v in d.items():
         if k.lower() in meta_keys or 'powered by' in k.lower(): continue
         if v in (None, '', [], {}, 0): continue
@@ -534,7 +534,7 @@ DEFAULT_PROMPTS = {
     "aadhar": "🆔 **AADHAR MODULE**\n━━━━━━━━━━━━━━━━━━━━━━\n🎯 **Input:** 12-digit Aadhar\n📝 **Example:** `123456789012`",
     "pan": "💳 **PAN CARD MODULE**\n━━━━━━━━━━━━━━━━━━━━━━\n🎯 **Input:** 10-char PAN\n📝 **Example:** `ABCDE1234F`",
     "vehicle": "🚗 **VEHICLE RC MODULE**\n━━━━━━━━━━━━━━━━━━━━━━\n🎯 **Input:** RC number\n📝 **Example:** `HR26BT2009`",
-    "vehicle2": "🚗 **VEHICLE2 (VAHANX)**\n━━━━━━━━━━━━━━━━━━━━━━\n🎯 **Input:** RC number\n📝 **Example:** `HR26BT2009`",
+    "vehicle2": "🔍 **ADVANCED OSINT SEARCH**\n━━━━━━━━━━━━━━━━━━━━━━\n🎯 **Input:** Phone, Email, Username, or Query\n📝 **Example:** `919506850759`\n✍️ *Send now...*",
     "upi": "💳 **UPI MODULE**\n━━━━━━━━━━━━━━━━━━━━━━\n🎯 **Input:** VPA\n📝 **Example:** `user@upi`",
     "tg": "🕵️ **TELEGRAM OSINT**\n━━━━━━━━━━━━━━━━━━━━━━\n🎯 **Input:** Numeric ID or Username\n📝 **Examples:** `5227406810` or `@username`",
     "ip": "🌍 **IP GEOLOCATION**\n━━━━━━━━━━━━━━━━━━━━━━\n🎯 **Input:** IP or domain\n📝 **Example:** `8.8.8.8`",
@@ -560,6 +560,7 @@ def build_api_url(t, inp):
     if "{upi}" in t: return t.replace("{upi}", inp)
     if "{rc}" in t: return t.replace("{rc}", inp)
     if "{vehicle}" in t: return t.replace("{vehicle}", inp)
+    if "{query}" in t: return t.replace("{query}", inp)
     tr = t.rstrip()
     if tr.endswith(('=', '&', '?/')): return tr + inp
     if re.search(r'[?&][^=&]+=$', tr): return tr + inp
@@ -696,7 +697,7 @@ def build_features_list():
         "🆔 Aadhar": "🪪 Aadhaar Info",
         "💳 PAN Lookup": "💳 PAN Card Info",
         "🚗 Vehicle Lookup": "🚗 Vehicle Info",
-        "🚗 Vehicle2 Lookup": "🚘 Vehicle VAHANX",
+        "🔍 Advanced Osint Search": "🔍 Advanced OSINT Search",
         "💳 UPI Lookup": "⚡ UPI Info",
         "🕵️ Telegram ID Lookup": "🐙 Telegram OSINT",
         "🌍 IP Lookup": "🌍 IP Info",
@@ -774,7 +775,7 @@ def build_main_buttons(user_id):
     hidden = load_hidden_buttons()
     buttons = [
         ["📱 Phone Lookup", "📱 Hi Tek"], ["🆔 Aadhar", "💳 PAN Lookup"],
-        ["🚗 Vehicle Lookup", "🚗 Vehicle2 Lookup"], ["💳 UPI Lookup", "🕵️ Telegram ID Lookup"],
+        ["🚗 Vehicle Lookup", "🔍 Advanced Osint Search"], ["💳 UPI Lookup", "🕵️ Telegram ID Lookup"],
         ["🌍 IP Lookup", "🇵🇰 Pak Lookup"], ["👨‍👩‍👧 Family Lookup", "📸 Instagram Lookup"],
         ["🏢 GST Lookup", "📄 PAN to GST"], ["🏦 IFSC Lookup", "📡 Call Tower Lookup"],
         ["📄 RC to PDF"],
@@ -802,17 +803,21 @@ def get_keyboard(user_id): return get_user_keyboard(user_id)
 
 BUTTON_LOOKUP_MAP = {
     "📱 Phone Lookup": "phone", "📱 Hi Tek": "hi_tek", "🆔 Aadhar": "aadhar",
-    "💳 PAN Lookup": "pan", "🚗 Vehicle Lookup": "vehicle", "🚗 Vehicle2 Lookup": "vehicle2",
+    "💳 PAN Lookup": "pan", "🚗 Vehicle Lookup": "vehicle", "🔍 Advanced Osint Search": "vehicle2",
     "💳 UPI Lookup": "upi", "🕵️ Telegram ID Lookup": "tg", "🌍 IP Lookup": "ip",
     "🇵🇰 Pak Lookup": "pak", "👨‍👩‍👧 Family Lookup": "family", "📸 Instagram Lookup": "instagram",
     "🏢 GST Lookup": "gst", "📄 PAN to GST": "pan_to_gst", "🏦 IFSC Lookup": "ifsc",
     "📡 Call Tower Lookup": "tower", "📄 RC to PDF": "rc_pdf",
 }
+BUTTON_LOOKUP_ALIASES = {
+    "Advanced Osint Search": "vehicle2",
+    "🚗 Vehicle2 Lookup": "vehicle2",
+}
 LOOKUP_TO_DISPLAY = {v: k for k, v in BUTTON_LOOKUP_MAP.items()}
 
 ALL_MAIN_BUTTON_TEXTS = {
     "📱 Phone Lookup", "📱 Hi Tek", "🆔 Aadhar", "💳 PAN Lookup",
-    "🚗 Vehicle Lookup", "🚗 Vehicle2 Lookup", "💳 UPI Lookup",
+    "🚗 Vehicle Lookup", "🔍 Advanced Osint Search", "Advanced Osint Search", "🚗 Vehicle2 Lookup", "💳 UPI Lookup",
     "🕵️ Telegram ID Lookup", "🌍 IP Lookup", "🇵🇰 Pak Lookup",
     "👨‍👩‍👧 Family Lookup", "📸 Instagram Lookup", "🏢 GST Lookup",
     "📄 PAN to GST", "🏦 IFSC Lookup", "📡 Call Tower Lookup",
@@ -826,7 +831,7 @@ def is_menu_button(text):
     t = text.strip()
     if t.startswith("/"): return True
     if t.lower() in ("cancel", "/cancel"): return True
-    if t in BUTTON_LOOKUP_MAP or t in ALL_MAIN_BUTTON_TEXTS: return True
+    if t in BUTTON_LOOKUP_MAP or t in BUTTON_LOOKUP_ALIASES or t in ALL_MAIN_BUTTON_TEXTS: return True
     if t in load_custom_buttons() or t in load_link_buttons(): return True
     return False
 
@@ -1182,20 +1187,47 @@ async def perform_lookup(update, context, lookup_type, input_text):
                 return
             fj = json.dumps(d, indent=2); rt = f"🚗 **VEHICLE RC**\n🆔 `{rc}`\n\n```json\n{fj}\n```{powered_by_text()}"
         elif lookup_type == "vehicle2":
-            rc = input_text.replace(" ", "").upper()
-            r = await async_fetch(f"{get_api_url('vehicle2')}{rc}")
-            if r and r.status_code == 200:
-                soup = BeautifulSoup(r.text, 'html.parser'); ex = {}
-                main = soup.find('main') or soup.find('div', class_=lambda c: c and 'result' in c.lower()) or soup
-                for row in main.find_all(['tr','li','div','p']):
-                    t = row.get_text(separator=':', strip=True)
-                    if ':' in t:
-                        p = t.split(':',1); k=p[0].strip().title(); v=p[1].strip()
-                        if k and v and len(k)<30 and len(v)<80 and k not in ex: ex[k]=v
-                if ex: ex = apply_json_add(ex, lookup_type)
-                card = "".join([f"▫️ **{k}:** `{v}`\n" for k,v in ex.items()]) or f"▫️ **RC:** `{rc}`\n"
-                fj = json.dumps(ex or {"rc":rc}, indent=2); rt = f"🚗 **VEHICLE2**\n{card}{powered_by_text()}"
-            else: raise Exception("VAHANX failed")
+            q = input_text.strip()
+            if not q:
+                await loading.edit_text("❌ **Invalid query.**\n\nSend a phone number, email, or query (e.g. `919506850759`).")
+                return
+            api_tmpl = get_api_url('vehicle2')
+            search_query = q
+            if search_query.isdigit() and len(search_query) == 10:
+                search_query = "91" + search_query
+            url = build_api_url(api_tmpl, search_query) if ("{input}" in api_tmpl or "{query}" in api_tmpl or "{}" in api_tmpl) else f"{api_tmpl}{search_query}"
+            r = await async_fetch(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}, timeout=30)
+            try: d = r.json()
+            except: d = {"raw_response": r.text}
+
+            def _is_empty_osint(res_dict):
+                if not isinstance(res_dict, dict) or not res_dict: return True
+                if res_dict.get("no_results") is True or res_dict.get("status") is False: return True
+                data_sec = res_dict.get("data")
+                if not data_sec or not isinstance(data_sec, dict): return True
+                for sv in data_sec.values():
+                    if isinstance(sv, dict) and "no results found" not in str(sv.get("title", "")).lower():
+                        return False
+                return True
+
+            if isinstance(d, dict) and _is_empty_osint(d) and search_query != q:
+                url_fb = build_api_url(api_tmpl, q) if ("{input}" in api_tmpl or "{query}" in api_tmpl or "{}" in api_tmpl) else f"{api_tmpl}{q}"
+                r_fb = await async_fetch(url_fb, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}, timeout=30)
+                try: d_fb = r_fb.json()
+                except: d_fb = None
+                if d_fb and isinstance(d_fb, dict) and not _is_empty_osint(d_fb):
+                    d = d_fb
+                    search_query = q
+
+            if isinstance(d, dict):
+                if _is_empty_osint(d):
+                    await loading.edit_text(f"⚠️ **No OSINT data found** for `{q}`\n\n_No leak records matched your query._")
+                    return
+                d = apply_json_add(clean_response_data(d, lookup_type), lookup_type)
+            if not _has_real_data(d):
+                await loading.edit_text(f"⚠️ **No OSINT data found** for `{q}`")
+                return
+            fj = json.dumps(d, indent=2); rt = f"🔍 **ADVANCED OSINT SEARCH**\n🎯 `{q}`\n\n```json\n{fj}\n```{powered_by_text()}"
         elif lookup_type == "pan":
             c = input_text.strip().upper()
             if len(c) != 10:
@@ -2797,11 +2829,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not ok and not is_admin(uid):
         feature_clicked = (
             text in BUTTON_LOOKUP_MAP or
+            text in BUTTON_LOOKUP_ALIASES or
             text in load_custom_buttons() or
             text in load_link_buttons() or
             text == "💣 Call/SMS Bomb" or
             text in ["📱 Phone Lookup", "📱 Hi Tek", "🆔 Aadhar", "💳 PAN Lookup",
-                     "🚗 Vehicle Lookup", "🚗 Vehicle2 Lookup", "💳 UPI Lookup",
+                     "🚗 Vehicle Lookup", "🔍 Advanced Osint Search", "Advanced Osint Search", "🚗 Vehicle2 Lookup", "💳 UPI Lookup",
                      "🕵️ Telegram ID Lookup", "🌍 IP Lookup", "🇵🇰 Pak Lookup",
                      "👨‍👩‍👧 Family Lookup", "📸 Instagram Lookup", "🏢 GST Lookup",
                      "📄 PAN to GST", "🏦 IFSC Lookup", "📡 Call Tower Lookup",
@@ -3282,8 +3315,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         lt = context.user_data.pop("lookup_type")
         await perform_lookup(update, context, lt, text); return
 
-    if text in BUTTON_LOOKUP_MAP:
-        lt = BUTTON_LOOKUP_MAP[text]; context.user_data["lookup_type"] = lt
+    if text in BUTTON_LOOKUP_MAP or text in BUTTON_LOOKUP_ALIASES:
+        lt = BUTTON_LOOKUP_MAP.get(text) or BUTTON_LOOKUP_ALIASES.get(text)
+        context.user_data["lookup_type"] = lt
         await reply_message(update, context, get_button_prompt(lt)); return
 
     cb = load_custom_buttons()
