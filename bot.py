@@ -27,7 +27,7 @@ DEFAULT_APIS = {
     "vehicle": "https://api.sarkariallupdates.com/api?=vehicle_full&key=30day&xr=",
     "vehicle2": "https://deeposint.felixrdx.xyz/api/developer/Cyb3rB4nn3r/?key=58c49cb2dbbf8dc53009705ecd7c4132&query=",
     "upi": "https://shuruuuuu-upi-basic-api-shuru-33.vercel.app/search?q=",
-    "pak": "API",
+    "pak": "https://api.sarkariallupdates.com/api?=num_to_info&key=key_f9f441d2400cd0d9&num=",
     "ip": "API",
     "family": "API",
     "tg": "API",
