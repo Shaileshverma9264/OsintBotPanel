@@ -561,6 +561,8 @@ def build_api_url(t, inp):
     if "{rc}" in t: return t.replace("{rc}", inp)
     if "{vehicle}" in t: return t.replace("{vehicle}", inp)
     if "{query}" in t: return t.replace("{query}", inp)
+    if "{keyword}" in t: return t.replace("{keyword}", inp)
+    if "{gst}" in t: return t.replace("{gst}", inp)
     tr = t.rstrip()
     if tr.endswith(('=', '&', '?/')): return tr + inp
     if re.search(r'[?&][^=&]+=$', tr): return tr + inp
@@ -814,6 +816,9 @@ BUTTON_LOOKUP_ALIASES = {
     "🚗 Vehicle2 Lookup": "vehicle2",
     "Vehicle2 Lookup": "vehicle2",
     "🚗 Advanced Osint Search": "vehicle2",
+    "PAN to GST": "pan_to_gst",
+    "PAN To GST": "pan_to_gst",
+    "pan to gst": "pan_to_gst",
 }
 LOOKUP_TO_DISPLAY = {v: k for k, v in BUTTON_LOOKUP_MAP.items()}
 
@@ -1392,10 +1397,22 @@ async def perform_lookup(update, context, lookup_type, input_text):
         elif lookup_type == "pan_to_gst":
             c = input_text.strip().upper()
             if len(c)!=10: await loading.edit_text("❌ 10-char PAN."); return
-            r = await async_fetch(get_api_url('pan_to_gst').format(c))
+            api_tmpl = get_api_url('pan_to_gst')
+            url = build_api_url(api_tmpl, c) if ("{input}" in api_tmpl or "{pan}" in api_tmpl or "{keyword}" in api_tmpl or "{}" in api_tmpl) else f"{api_tmpl}{c}"
+            r = await async_fetch(url, timeout=30)
             try: d = r.json()
             except: d = {"raw_response": r.text}
-            if isinstance(d, dict): d = apply_json_add(clean_response_data(d, lookup_type), lookup_type)
+            if isinstance(d, dict):
+                if d.get("success") is False or d.get("status") in (False, "error", "fail", "failed"):
+                    msg = d.get("message") or d.get("error") or "No GST records found for this PAN."
+                    await loading.edit_text(f"⚠️ **PAN to GST Not Found** for `{c}`\n\n_{msg}_")
+                    return
+                if "data" in d and isinstance(d["data"], dict):
+                    d["data"] = apply_json_add(clean_response_data(d["data"], lookup_type), lookup_type)
+                d = apply_json_add(clean_response_data(d, lookup_type), lookup_type)
+            if not _has_real_data(d):
+                await loading.edit_text(f"⚠️ **No GST records found** for `{c}`")
+                return
             fj = json.dumps(d, indent=2); rt = f"📄 **PAN → GST**\n🆔 `{c}`\n\n```json\n{fj}\n```{powered_by_text()}"
         elif lookup_type == "ifsc":
             c = input_text.strip().upper()
