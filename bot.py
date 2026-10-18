@@ -34,7 +34,7 @@ DEFAULT_APIS = {
     "aadhar": "API",
     "instagram": "API",
     "gst": "API",
-    "pan_to_gst": "API",
+    "pan_to_gst": "https://pantogstlookupapi.onrender.com/api/search?keyword=",
     "ifsc": "https://api.sarkariallupdates.com/api?=ifse&key=30day&ifse=",
     "tower": "API",
     "rc_pdf": "API",
